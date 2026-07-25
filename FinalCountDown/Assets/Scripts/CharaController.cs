@@ -24,6 +24,10 @@ public class CharaController : MonoBehaviour
     [Header("References")]
     public Transform ViewCamera;
 
+    [HideInInspector]
+    public float SpeedMalus = 0;
+
+
     private Rigidbody body;
     private CapsuleCollider capsule;
     private float verticalRotation = 0f;
@@ -68,7 +72,7 @@ public class CharaController : MonoBehaviour
             InputVector += transform.right;
 
         InputVector.Normalize();
-        var targetVelocity = InputVector * MovementSpeed;
+        var targetVelocity = InputVector * Mathf.Max((MovementSpeed - SpeedMalus), 1);
 
         Vector3.SmoothDamp(MovementVector, targetVelocity, ref MovementVector, MovementDampening);
 
@@ -80,7 +84,6 @@ public class CharaController : MonoBehaviour
         {
             if (isGrounded)
             {
-                Debug.Log("ground detected");
                 body.AddForce(0, JumpPower, 0, ForceMode.Impulse);
             }
         }
