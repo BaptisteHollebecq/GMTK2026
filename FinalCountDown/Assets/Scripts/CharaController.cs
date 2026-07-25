@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 public class CharaController : MonoBehaviour
 {
@@ -18,18 +19,25 @@ public class CharaController : MonoBehaviour
     public float MovementDampening = .1f;
     public float JumpPower = 10f;
     public float GravityAmplifier = 1f;
+    public float CrouchAnimTime = .15f;
 
     [Header("References")]
     public Transform ViewCamera;
 
     private Rigidbody body;
+    private CapsuleCollider capsule;
     private float verticalRotation = 0f;
     private Vector3 MovementVector = new Vector3();
-    private bool isGrounded;
+
+
+    private bool isGrounded = true;
+    private bool isCrouched = false;
+
 
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
+        capsule = GetComponent<CapsuleCollider>();
     }
 
     private void Update()
@@ -82,6 +90,21 @@ public class CharaController : MonoBehaviour
         if (!isGrounded)
             body.AddForce(0, -GravityAmplifier, 0, ForceMode.Acceleration);
 
+        //------------ Crouch
+
+        if (Input.GetKeyDown(Crouch))
+        {
+            capsule.center = new Vector3(0, -.5f, 0);
+            capsule.height = 1;
+            ViewCamera.DOLocalMove(new Vector3(0, -.35f, 0), CrouchAnimTime);
+            isCrouched = true;
+        }
+        if (Input.GetKeyUp(Crouch))
+        {
+            isCrouched = false;
+            UnCrouch();
+        }
+        UnCrouch();
 
     }
 
@@ -90,5 +113,33 @@ public class CharaController : MonoBehaviour
         Vector3 newVelocity = new Vector3(MovementVector.x, body.linearVelocity.y, MovementVector.z);
         body.linearVelocity = newVelocity;
     }
+
+    private void UnCrouch()
+    {
+        if (!isCrouched)
+        {
+            if (CanGetUp())
+            {
+                capsule.center = new Vector3(0, 0, 0);
+                capsule.height = 2;
+                ViewCamera.DOLocalMove(new Vector3(0, .65f, 0), CrouchAnimTime);
+                
+            }
+
+        }
+    }
+
+    private bool CanGetUp()
+    {
+        if (!Physics.Raycast(transform.position + new Vector3(-.5f, 0, 0), -Vector2.down, 1.1f) &&
+            !Physics.Raycast(transform.position + new Vector3(.5f, 0, 0), -Vector2.down, 1.1f) &&
+            !Physics.Raycast(transform.position + new Vector3(0, 0, -.5f), -Vector2.down, 1.1f) &&
+            !Physics.Raycast(transform.position + new Vector3(0, 0, .5f), -Vector2.down, 1.1f))
+        {
+            return true;
+        }
+        return false;
+    }
+
 
 }
