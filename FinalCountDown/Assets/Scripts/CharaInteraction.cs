@@ -21,13 +21,19 @@ public class CharaInteraction : MonoBehaviour
     [SerializeField] private AnimationCurve massToStrength = AnimationCurve.Linear(1f, 1f, 50f, 0.1f);
     // ↑ Courbe : en X la masse de l'objet, en Y un multiplicateur de force (1 = facile, proche de 0 = très dur)
 
-    [Header("Rotation avec la caméra")]
+    [Header("Cam Rotation")]
     [SerializeField] private bool rotateWithCamera = true;
     [SerializeField] private float rotationLerpSpeed = 6f;
 
-
     [Header("Throw")]
     [SerializeField] private float throwForce = 12f;
+
+    [Header("Collision Properties")]
+    public AnimationCurve VelocityPerMass;
+    public AnimationCurve DamagePerMass;
+    public float RagdollMintime = 1;
+    public float RagdollRecoveryTime = 1;
+    public float RagdollMinVelocity = .3f;
 
     private CharaController controller;
     private Rigidbody heldBody;
@@ -156,5 +162,29 @@ public class CharaInteraction : MonoBehaviour
             ViewCamera.transform.position + ViewCamera.transform.forward * grabDistance);
     }
 
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (heldBody!= null && collision.gameObject == heldBody.gameObject)
+            return;
+
+        int IncomingLayer = LayerMask.NameToLayer("Grabable");
+        if (collision.gameObject.layer != IncomingLayer)
+        {
+            //Check velocity (maybe Y velocity) And apply Damage
+            Debug.Log("Collision avec random");
+        }
+        else
+        {
+            Rigidbody rb = collision.gameObject.GetComponent<Rigidbody>();
+
+            if (rb.linearVelocity.magnitude > VelocityPerMass.Evaluate(rb.mass))
+            {
+                //appliquer des degats
+                //PlayerLife -= DamagePerMass.Evaluate(rb.mass)
+                controller.Ragdoll(true, RagdollRecoveryTime, RagdollMinVelocity);
+                controller.PushPlayer(collision.GetContact(0).point, collision.GetContact(0).impulse);
+            }
+        }
+    }
 
 }
