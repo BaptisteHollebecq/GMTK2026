@@ -1,8 +1,9 @@
 using UnityEngine;
 using DG.Tweening;
 using System.Collections;
+using Unity.Netcode;
 
-public class CharaController : MonoBehaviour
+public class CharaController : NetworkBehaviour
 {
 
     [Header("Inputs Keys")]
@@ -46,18 +47,33 @@ public class CharaController : MonoBehaviour
     private bool isCrouched = false;
 
 
-    private void Awake()
+    public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
+
+        if (IsOwner)
+        {
+            ViewCamera.GetComponent<Camera>().enabled = true;
+        }
+
+
         body = GetComponent<Rigidbody>();
         capsule = GetComponent<CapsuleCollider>();
 
         Cursor.lockState = CursorLockMode.Locked;
+        body.isKinematic = false;
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F9))
+        if (!IsOwner)
+            return;
+
+        if (Input.GetKeyDown(KeyCode.R))
             isRagdoll = !isRagdoll;
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+            Cursor.lockState = CursorLockMode.None;
 
         if (!isRagdoll)
         {
@@ -134,6 +150,9 @@ public class CharaController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (!IsOwner)
+            return;
+
         if (!isRagdoll)
         {
             Vector3 newVelocity = new Vector3(MovementVector.x, body.linearVelocity.y, MovementVector.z);

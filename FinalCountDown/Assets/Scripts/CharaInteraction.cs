@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem.XR;
+using Unity.Netcode;
 
-public class CharaInteraction : MonoBehaviour
+public class CharaInteraction : NetworkBehaviour
 {
     public KeyCode UseObject;
     public string UsableTag = "Usable";
@@ -20,10 +21,6 @@ public class CharaInteraction : MonoBehaviour
     [SerializeField] private float maxVelocity = 12f;       // Vitesse max de l'objet tenu
     [SerializeField] private AnimationCurve massToStrength = AnimationCurve.Linear(1f, 1f, 50f, 0.1f);
     // ↑ Courbe : en X la masse de l'objet, en Y un multiplicateur de force (1 = facile, proche de 0 = très dur)
-
-    [Header("Cam Rotation")]
-    [SerializeField] private bool rotateWithCamera = true;
-    [SerializeField] private float rotationLerpSpeed = 6f;
 
     [Header("Throw")]
     [SerializeField] private float throwForce = 12f;
@@ -52,6 +49,9 @@ public class CharaInteraction : MonoBehaviour
 
     private void Update()
     {
+        if (!IsOwner)
+            return;
+
         if (Input.GetMouseButtonDown(0))
         {
             if (heldBody == null)
@@ -92,9 +92,16 @@ public class CharaInteraction : MonoBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, grabDistance, GrabMask))
         {
             Rigidbody rb = hit.rigidbody;
+
             if (rb == null) return;
 
-            hitPoint = hit.rigidbody.transform.InverseTransformPoint(hit.point);
+            rb.isKinematic = false;
+
+            ChangeOwnerShipRPC(rb.GetComponent<NetworkObject>(), NetworkManager.Singleton.LocalClientId);
+
+            Debug.Log(rb.GetComponent<NetworkObject>().OwnerClientId);
+
+           hitPoint = hit.rigidbody.transform.InverseTransformPoint(hit.point);
             heldBody = rb;
             heldObjectMass = rb.mass;
             controller.SpeedMalus = rb.mass;
@@ -107,12 +114,21 @@ public class CharaInteraction : MonoBehaviour
         }
     }
 
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void ChangeOwnerShipRPC(NetworkObjectReference reference, ulong askingID)
+    {
+        NetworkObject obj;
+        reference.TryGet(out obj);
+
+        obj.ChangeOwnership(askingID);
+    }
+
     private void MoveHeldObject()
     {
         //Debug.Log(heldBody.angularVelocity);
 
         Vector3 targetPos = ViewCamera.transform.position + ViewCamera.transform.forward * currentHoldDistance;
-        Vector3 toTarget = targetPos - heldBody.transform.TransformPoint(hitPoint);
+        Vector3 toTarget = targetPos -heldBody.transform.TransformPoint(hitPoint);
 
         // Multiplicateur basé sur le poids : un objet lourd répond beaucoup moins vite
         float strength = Mathf.Clamp(massToStrength.Evaluate(heldObjectMass), 0.05f, 1f);
@@ -127,14 +143,6 @@ public class CharaInteraction : MonoBehaviour
         float velCap = maxVelocity * Mathf.Clamp01(0.3f + strength);
         if (heldBody.linearVelocity.magnitude > velCap)
             heldBody.linearVelocity = heldBody.linearVelocity.normalized * velCap;
-
-        // Rotation : suit la caméra mais avec un lag proportionnel au poids
-        /*if (rotateWithCamera)
-        {
-            Quaternion targetRot = ViewCamera.transform.rotation * grabbedRotationOffset;
-            float rotSpeed = rotationLerpSpeed * strength;
-            heldBody.MoveRotation(Quaternion.Slerp(heldBody.rotation, targetRot, Time.fixedDeltaTime * rotSpeed));
-        }*/
 
         if (toTarget.magnitude > grabDistance * 1f)
             Release(false);
@@ -180,6 +188,9 @@ public class CharaInteraction : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (!IsOwner)
+            return;
+
         if (heldBody!= null && collision.gameObject == heldBody.gameObject)
             return;
 
@@ -208,3 +219,4 @@ public class CharaInteraction : MonoBehaviour
     }
 
 }
+
