@@ -31,6 +31,8 @@ public class CharaInteraction : MonoBehaviour
     [Header("Collision Properties")]
     public AnimationCurve VelocityPerMass;
     public AnimationCurve DamagePerMass;
+    public float FallDamageVelocity = 14f;
+    public float FallDamageDamage = 5;
     public float RagdollMintime = 1;
     public float RagdollRecoveryTime = 1;
     public float RagdollMinVelocity = .3f;
@@ -41,6 +43,7 @@ public class CharaInteraction : MonoBehaviour
     private float currentHoldDistance;
     private Quaternion grabbedRotationOffset;
     private Vector3 hitPoint;
+    private float fallingSpeed = 0;
 
     private void Awake()
     {
@@ -77,6 +80,9 @@ public class CharaInteraction : MonoBehaviour
     {
         if (heldBody != null)
             MoveHeldObject();
+
+        if (controller.GetVerticalVelocity() < 0)
+            fallingSpeed = controller.GetVerticalVelocity();
     }
 
     private void TryGrab()
@@ -162,18 +168,33 @@ public class CharaInteraction : MonoBehaviour
             ViewCamera.transform.position + ViewCamera.transform.forward * grabDistance);
     }
 
+    private bool GroundContact(Collision collision)
+    {
+        foreach (ContactPoint contact in collision.contacts)
+        {
+            if (Vector3.Dot(contact.normal, Vector3.up) > 0.5f)
+                return true;
+        }
+        return false;
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
         if (heldBody!= null && collision.gameObject == heldBody.gameObject)
             return;
 
         int IncomingLayer = LayerMask.NameToLayer("Grabable");
-        if (collision.gameObject.layer != IncomingLayer)
+        if (GroundContact(collision))
         {
-            //Check velocity (maybe Y velocity) And apply Damage
-            Debug.Log("Collision avec random");
+            if (Mathf.Abs(fallingSpeed) > FallDamageVelocity)
+            {
+                //appliquer des degats
+                //PlayerLife -= Damage
+                controller.Ragdoll(true, RagdollRecoveryTime, RagdollMinVelocity);
+                controller.PushPlayer(transform.position + new Vector3(0,.5f,0), transform.right * 1.25f);
+            }
         }
-        else
+        else if (collision.gameObject.layer == IncomingLayer)
         {
             Rigidbody rb = collision.gameObject.GetComponent<Rigidbody>();
 
@@ -182,7 +203,6 @@ public class CharaInteraction : MonoBehaviour
                 //appliquer des degats
                 //PlayerLife -= DamagePerMass.Evaluate(rb.mass)
                 controller.Ragdoll(true, RagdollRecoveryTime, RagdollMinVelocity);
-                controller.PushPlayer(collision.GetContact(0).point, collision.GetContact(0).impulse);
             }
         }
     }

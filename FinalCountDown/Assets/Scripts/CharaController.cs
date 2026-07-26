@@ -210,4 +210,9 @@ public class CharaController : MonoBehaviour
         body.AddForceAtPosition(push, pos, ForceMode.Impulse);
     }
 
+    public float GetVerticalVelocity()
+    {
+        return body.linearVelocity.y;
+    }
+
 }
